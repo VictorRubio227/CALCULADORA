@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inicio</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="index">
+    <img src="{{ url_for('static', filename='img/PrimeMX 2024_RGB_Blanco-Color.png') }}" alt="Logo" class="logo-esquina">
+    <a href="/"><svg class="icono-casa2" style=" width: 60px; height: 60px; " xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></a>
+    <h1 style="margin-top: 15%;">Calculadora de Comisiones Semanal</h1>
+    <h2 style="color: whitesmoke; padding: 10px; font-size: 20px;">Selecciona la familia a calcular</h2>
+    <div class="menu-cards" style="margin-bottom: 50px;">
+        <a href="/premium" class="card " style="background-color: #09c3be; font-size: 30px;">📱 PREMIUM</a>
+        <a href="/armalo" class="card " style="background-color: #e2ba13 ; font-size: 30px;">📱 NEGOCIOS </a>
+        <a href="/simples" class="card" style="background-color: #7cc914 ; font-size: 30px;">📱 PIAS</a>
+        
+    </div>
+
+    <div class="resultado-lateral3" id="recuadro-total-global" style="margin-left: 20px; display: none; padding: 30px 45px ;">
+        <p style="font-size: 20px;margin-top: 3px;"><strong>Total Global:</strong></p>
+        <p id="total-global" class="total-cifra" style="font-size: 45px; color: white; margin-bottom: 3px;">$0</p>
+    </div>
+
+    <footer>
+        <p >&copy; <span id="currentYear"></span> PRIMEMX. Todos los derechos reservados.</p>
+    </footer>
+
+    <script>
+    function formatearNumero(numero) {
+        return numero.toLocaleString('es-MX', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        });
+    }
+
+    function actualizarComisionGlobal() {
+        const keys = [
+            "comision_premium",
+            "comision_armalo",
+            "comision_simple",
+            "comision_seguros", 
+            "comision_addons",
+            "comision_accesorios",
+            "comision_total"
+        ];
+
+        let total = 0;
+        for (let key of keys) {
+            total += parseFloat(localStorage.getItem(key) || 0);
+        }
+
+        const recuadro = document.getElementById("recuadro-total-global");
+        const totalElement = document.getElementById("total-global");
+        totalElement.textContent = "$" + formatearNumero(total);
+
+        // Mostrar u ocultar según el valor total
+        if (total > 0) {
+            recuadro.style.display = "inline-block";
+        } else {
+            recuadro.style.display = "none";
+        }
+    }
+
+    // Ejecutar al cargar
+    window.addEventListener("load", () => {
+        actualizarComisionGlobal();
+        document.getElementById("currentYear").textContent = new Date().getFullYear();
+    });
+
+    // Y seguir actualizando cada 2 segundos por si el usuario cambia otra categoría
+    setInterval(actualizarComisionGlobal, 2000);
+
+    const tokenFromServer = "{{ token|default('') }}";
+
+    if (tokenFromServer) {
+        localStorage.setItem("token", tokenFromServer);
+        console.log("Token guardado en localStorage:", tokenFromServer);
+    }
+
+    // Reescribir todos los enlaces internos para agregar el token
+    document.addEventListener("DOMContentLoaded", function () {
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        // Reescribe todos los <a> internos
+        document.querySelectorAll("a[href^='/']").forEach(link => {
+        const url = new URL(link.href, window.location.origin);
+        url.searchParams.set("token", token);
+        link.href = url.toString();
+        });
+    });
+</script>
+</body>
+</html>
+
+

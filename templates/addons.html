@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Addons - Calculadora de Comisiones</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-left">
+            <img src="{{ url_for('static', filename='img/PrimeMX 2024_RGB_Blanco-Color.png') }}" alt="Logo" class="logo-esquina2">
+            <a href="/" class="logo-link">
+                <svg class="icono-casa" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
+                </svg>    
+        </a>
+        </div>
+        <ul class="nav-links">
+            <li><a href="/premium" style="font-size: 15px;">PREMIUM</a></li>
+            <li><a href="/armalo" style="font-size: 15px;">NEGOCIOS</a></li>
+            <li><a href="/simples" style="font-size: 15px;">PIAS</a></li>
+            <li><a href="/seguros" style="font-size: 15px;">SEGUROS</a></li>
+            <li><a href="/accesorios" style="font-size: 15px;">ACCESORIOS</a></li>
+            <li><a href="/totalplay" style="font-size: 15px;">TOTALPLAY</a></li>
+        </ul>
+    </nav>
+    <h1>Calculadora Comisiones Addons</h1>
+    <h2>Alcance Cuota mínima de Pospago de 80%</h2>
+    <h3>Alcance Cuota mínima de Addons de 80%</h3>
+
+    <form method="POST" id="formulario" class="contenedor-principal" onsubmit="return false;">
+        <div class="contenedor-flex">
+            <!-- Tabla -->
+            <div id="tabla-addons">
+                {% include 'tabla_comisiones_addons.html' %}
+            </div>
+
+            <!-- Total -->
+            <div class="resultado-lateral">
+                <p>Comisión Addons:</p>
+                <p id="total-comision" class="total-cifra">${{ "{:,}".format(total_comision) }}</p>
+            </div>
+
+            <!-- RECUADRO GLOBAL -->
+            <div class="resultado-lateral2" style="margin-left: 20px;">
+                <p><strong>Total Global:</strong></p>
+                <p id="total-global" class="total-cifra">$0</p>
+            </div>
+        </div>
+
+        <div style="margin-top:10px;">
+            <button type="button" class="boton-limpiar" onclick="limpiarFormulario()">🗑️ Borrar datos</button>
+        </div>
+    </form>
+
+    <footer>
+        <p>&copy; <span id="currentYear"></span> PRIMEMX. Todos los derechos reservados.</p>
+    </footer>
+
+    <script>
+        function formatearNumero(numero) {
+            return numero.toLocaleString('es-MX', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            });
+        }
+
+        function actualizarComision(plan, monto) {
+            const input = document.getElementById("cantidad-" + plan);
+            let cantidad = parseInt(input.value) || 0;
+
+            if (cantidad < 0) {
+                cantidad = 0;
+                input.value = 0;
+            }
+
+            const comision = Math.round(cantidad * monto * 0.8);
+            document.getElementById("comision-" + plan).innerText = "$" + formatearNumero(comision);
+            guardarEnLocalStorage(plan, cantidad);
+            calcularTotalComision();
+        }
+
+        function calcularTotalComision() {
+            let total = 0;
+            document.querySelectorAll('input[type="number"]').forEach(input => {
+                let cantidad = parseInt(input.value) || 0;
+                const monto = parseFloat(input.getAttribute("data-monto"));
+
+                if (cantidad < 0) {
+                    cantidad = 0;
+                    input.value = 0;
+                }
+
+                total += Math.round(cantidad * monto * 0.8);
+            });
+
+            document.getElementById("total-comision").innerText = "$" + formatearNumero(total);
+            
+            // *** GUARDAR COMISION ADDONS ***
+            localStorage.setItem("comision_addons", total);
+            
+            // *** ACTUALIZAR TOTAL GLOBAL ***
+            actualizarComisionGlobal();
+        }
+
+        // *** FUNCIÓN PARA ACTUALIZAR TOTAL GLOBAL ***
+        function actualizarComisionGlobal() {
+            const keys = [
+                "comision_premium",
+                "comision_armalo",
+                "comision_simple",
+                "comision_seguros", 
+                "comision_addons",
+                "comision_accesorios",
+                "comision_total",
+            ];
+            let total = 0;
+            for (let key of keys) {
+                total += parseFloat(localStorage.getItem(key) || 0);
+            }
+            document.getElementById("total-global").textContent = "$" + formatearNumero(Math.round(total));
+        }
+
+        function limpiarFormulario() {
+            // *** LIMPIAR SOLO DATOS DE ADDONS (NO TODO EL LOCALSTORAGE) ***
+            localStorage.removeItem("comision_addons");
+            
+            // Limpiar datos específicos de addons
+            document.querySelectorAll('input[type="number"]').forEach(input => {
+                const plan = input.name;
+                localStorage.removeItem(`addon-${plan}`);
+                input.value = 0;
+                const monto = parseFloat(input.getAttribute("data-monto"));
+                actualizarComision(plan, monto);
+            });
+            
+            document.getElementById("total-comision").innerText = "$0";
+
+            
+            // *** ACTUALIZAR TOTAL GLOBAL DESPUÉS DE LIMPIAR ***
+            actualizarComisionGlobal();
+
+            localStorage.removeItem('datosTablaAddons');
+        }
+
+        function guardarEnLocalStorage(plan, cantidad) {
+            localStorage.setItem(`addon-${plan}`, cantidad);
+        }
+
+        function cargarDesdeLocalStorage() {
+            document.querySelectorAll('input[type="number"]').forEach(input => {
+                const plan = input.name;
+                const valorGuardado = localStorage.getItem(`addon-${plan}`);
+                if (valorGuardado !== null) {
+                    input.value = valorGuardado;
+                }
+            });
+        }
+
+        window.addEventListener("load", () => {
+            cargarDesdeLocalStorage();
+            calcularTotalComision();
+
+            document.querySelectorAll('input[type="number"]').forEach(input => {
+                const plan = input.name;
+                const monto = parseFloat(input.getAttribute("data-monto"));
+                input.oninput = () => actualizarComision(plan, monto);
+            });
+            
+            // *** ACTUALIZAR TOTAL GLOBAL AL CARGAR ***
+            actualizarComisionGlobal();
+            document.getElementById("currentYear").textContent = new Date().getFullYear();
+        });
+
+        // *** ACTUALIZAR TOTAL GLOBAL CADA 2 SEGUNDOS ***
+        setInterval(actualizarComisionGlobal, 2000);
+
+        document.addEventListener('input', () => {
+        const tabla = document.getElementById('tabla-addons');
+        if (!tabla) return;
+
+        const datos = [];
+
+        const filas = tabla.querySelectorAll('tbody tr');
+        filas.forEach(fila => {
+            const plan = fila.cells[0]?.textContent.trim() || '';
+            const input = fila.querySelector('input[type="number"][data-monto]');
+            const cantidad = parseInt(input.value, 10) || 0;
+            const monto = parseFloat(input.getAttribute('data-monto')) || 0;
+
+            datos.push({ plan, cantidad, monto });
+        });
+
+        localStorage.setItem('datosTablaAddons', JSON.stringify(datos));
+        });
+
+        const tokenFromServer = "{{ token|default('') }}";
+
+    if (tokenFromServer) {
+        localStorage.setItem("token", tokenFromServer);
+        console.log("Token guardado en localStorage:", tokenFromServer);
+    }
+
+    // Reescribir todos los enlaces internos para agregar el token
+    document.addEventListener("DOMContentLoaded", function () {
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        // Reescribe todos los <a> internos
+        document.querySelectorAll("a[href^='/']").forEach(link => {
+        const url = new URL(link.href, window.location.origin);
+        url.searchParams.set("token", token);
+        link.href = url.toString();
+        });
+    });
+    </script>
+</body>
+</html>
+
+
+

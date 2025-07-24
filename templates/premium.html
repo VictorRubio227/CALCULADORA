@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium - Calculadora de Comisiones</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="navbar-left">
+            <img src="{{ url_for('static', filename='img/PrimeMX 2024_RGB_Blanco-Color.png') }}" alt="Logo" class="logo-esquina2">
+            <a href="/" class="logo-link">
+                <svg class="icono-casa" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
+                </svg>    
+        </a>
+        </div>
+        <ul class="nav-links">
+            <li><a href="/armalo" style="font-size: 15px;">NEGOCIOS</a></li>
+            <li><a href="/simples"style="font-size: 15px;">PIAS</a></li>
+            <li><a href="/seguros" style="font-size: 15px;">SEGUROS</a></li>
+            <li><a href="/accesorios" style="font-size: 15px;">ACCESORIOS</a></li>
+            <li><a href="/addons" style="font-size: 15px;">ADDONS</a></li>
+            <li><a href="/totalplay" style="font-size: 15px;">TOTALPLAY</a></li>
+        </ul>
+    </nav>
+    <h1 >Calculadora Comisiones Planes Premium Semanal</h1>
+    <h2 >Alcance Cuota mínima de Pospago de 80%</h2>
+    <h3 >Alcance Cuota mínima de Renovación de 80%</h3>
+
+    <form method="POST" id="formulario" class="contenedor-principal">
+        <div class="form-section">
+            <label style="color: white;"><strong>Tipo de Venta:</strong></label><br>
+            <label style="color: white;"><input type="radio" name="tipo_venta" value="equipo_nuevo"> Pospago y Renovación Con Equipo Nuevo</label>
+            <label style="color: white;"><input type="radio" name="tipo_venta" value="equipo_propio"> Pospago Con Equipo Propio</label> <br>
+            <label style="color: white;"><input type="checkbox" id="activar-incentivos"> Activar Incentivos</label>
+        </div>
+        
+
+        <div class="contenedor-flex">
+            <div id="tabla-comisiones">
+                {% include 'tabla_comisiones.html' %}
+            </div>
+
+            <div class="resultado-lateral">
+                <p>Total Premium:</p>
+                <p id="total-comision" class="total-cifra">
+                    ${{ "{:,}".format(total_comision) }}
+                </p>
+            </div>
+
+            <!-- RECUADRO GLOBAL -->
+            <div class="resultado-lateral2" style="margin-left: 20px;">
+                <p><strong>Total Global:</strong></p>
+                <p id="total-global" class="total-cifra">$0</p>
+            </div>
+        </div>
+
+        <div style="margin-top:2px;">
+            <button type="button" class="boton-limpiar" onclick="limpiarFormulario()">🗑️ Borrar datos guardados</button>
+        </div>
+        
+    </form>
+    <table id="tabla-global" style="display:none;">
+    <thead>
+      <tr>
+        <th>Metrica</th>
+        <th>Comisión</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Pospago y Renovaciones</td><td id="td-pospago">$0</td></tr>
+      <tr><td>Seguros</td><td id="td-seguros">$0</td></tr>
+      <tr><td>Accesorios</td><td id="td-accesorios">$0</td></tr>
+      <tr><td>Addons</td><td id="td-addons">$0</td></tr>
+      <tr><td>Totalplay</td><td id="td-total">$0</td></tr>
+      <tr><td><strong style="font-size: 18px;">Total Global</strong></td><td id="td-total-global" style="font-size: 18px; font-weight: bold;"><strong>$0</strong></td></tr>
+    </tbody>
+    </table>
+    <footer>
+        <p>&copy; <span id="currentYear"></span> PRIMEMX. Todos los derechos reservados.</p>
+    </footer>
+
+
+    
+
+    <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>-->
+
+    <script>
+        function formatearNumero(numero) {
+            return numero.toLocaleString('es-MX');
+        }
+
+        function getTipoVentaActual() {
+            const seleccionado = document.querySelector('input[name="tipo_venta"]:checked');
+            return seleccionado ? seleccionado.value : 'equipo_nuevo';
+        }
+
+        function guardarValores(tipo) {
+            const datos = {};
+            document.querySelectorAll('input[type="number"]').forEach(input => {
+                datos[input.id] = input.value;
+            });
+            localStorage.setItem(`premium_comisiones_${tipo}`, JSON.stringify(datos));
+        }
+
+        function toggleIncentivos() {
+            const incentivosActivos = document.getElementById('activar-incentivos').checked;
+            const columnasIncentivo = document.querySelectorAll('.col-incentivo');
+
+            columnasIncentivo.forEach(columna => {
+                columna.style.display = incentivosActivos ? 'table-cell' : 'none';
+            });
+
+            // Guardar el estado de incentivos por tipo de venta
+            const tipoActual = getTipoVentaActual();
+            localStorage.setItem(`premium_incentivos_${tipoActual}`, JSON.stringify(incentivosActivos));
+            
+            calcularTotalComision();
+        }
+
+        function restaurarEstadoIncentivos() {
+            const tipoActual = getTipoVentaActual();
+            const incentivosGuardados = JSON.parse(localStorage.getItem(`premium_incentivos_${tipoActual}`) || 'false');
+            const checkbox = document.getElementById('activar-incentivos');
+            
+            if (checkbox) {
+                checkbox.checked = incentivosGuardados;
+                
+                // Aplicar el estado visual inmediatamente
+                const columnasIncentivo = document.querySelectorAll('.col-incentivo');
+                columnasIncentivo.forEach(columna => {
+                    columna.style.display = incentivosGuardados ? 'table-cell' : 'none';
+                });
+            }
+        }
+
+        function restaurarValores(tipo) {
+            const datos = JSON.parse(localStorage.getItem(`premium_comisiones_${tipo}`)) || {};
+            document.querySelectorAll('input[type="number"]').forEach(input => {
+                const cantidad = datos[input.id] || 0;
+                input.value = cantidad;
+                actualizarComision(input.name, parseFloat(input.getAttribute("data-monto")));
+                input.oninput = () => actualizarComision(input.name, parseFloat(input.getAttribute("data-monto")));
+            });
+        }
+
+        function actualizarComision(plan, monto) {
+            const input = document.getElementById("cantidad-" + plan);
+            const cantidad = parseInt(input.value) || 0;
+            const comision = cantidad * monto;
+            const incentivo = parseFloat(input.getAttribute("data-incentivo")) || 0;
+
+            document.getElementById("comision-" + plan).innerText = "$" + formatearNumero(comision);
+
+            const incentivosActivos = document.getElementById('activar-incentivos').checked;
+            const celdaIncentivo = document.getElementById("incentivo-" + plan);
+
+            if (incentivosActivos && incentivo > 0) {
+                celdaIncentivo.innerText = "$" + formatearNumero(cantidad * incentivo);
+            } else if (celdaIncentivo) {
+                celdaIncentivo.innerText = "$0";
+            }
+
+            guardarValores(getTipoVentaActual());
+            calcularTotalComision();
+        }
+
+        function calcularTotalComision() {
+            let totalComision = 0;
+            let totalIncentivos = 0;
+            const incentivosActivos = document.getElementById('activar-incentivos').checked;
+
+            document.querySelectorAll('input[type="number"]').forEach(input => {
+                const cantidad = parseInt(input.value) || 0;
+                const monto = parseFloat(input.getAttribute("data-monto"));
+                const incentivo = parseFloat(input.getAttribute("data-incentivo")) || 0;
+
+                totalComision += cantidad * monto;
+                if (incentivosActivos && incentivo > 0) {
+                    totalIncentivos += cantidad * incentivo;
+                }
+            });
+
+            const totalPremium = totalComision + totalIncentivos;
+            document.getElementById("total-comision").innerText = "$" + formatearNumero(totalPremium);
+
+            const tipoActual = getTipoVentaActual();
+            localStorage.setItem(`comision_premium_${tipoActual}`, totalPremium);
+            localStorage.setItem(`incentivos_premium_${tipoActual}`, totalIncentivos);
+
+            calcularTotalPremiumCompleto();
+        }
+
+        function calcularTotalPremiumCompleto() {
+            const totalEquipoNuevo = parseFloat(localStorage.getItem("comision_premium_equipo_nuevo") || 0);
+            const totalEquipoPropio = parseFloat(localStorage.getItem("comision_premium_equipo_propio") || 0);
+            const totalPremium = totalEquipoNuevo + totalEquipoPropio;
+            localStorage.setItem("comision_premium", totalPremium);
+            actualizarComisionGlobal();
+            //cargarTotalesGlobales();
+        }
+
+        function actualizarComisionGlobal() {
+            const keys = [
+                "comision_premium",
+                "comision_armalo",
+                "comision_simple",
+                "comision_seguros",
+                "comision_addons",
+                "comision_accesorios",
+                "comision_total"
+            ];
+
+            let total = 0;
+            for (let key of keys) {
+                total += parseFloat(localStorage.getItem(key) || 0);
+            }
+
+            document.getElementById("total-global").textContent = "$" + formatearNumero(Math.round(total));
+        }
+
+        // *** FUNCIÓN PARA CARGAR TABLA INICIAL ***
+        function cargarTablaInicial(tipoVenta) {
+            const formData = new FormData();
+            formData.append("tipo_venta", tipoVenta);
+
+            return fetch("/tabla_comisiones", {
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("tabla-comisiones").innerHTML = data.html;
+                return data;
+            });
+        }
+
+        // Cambio de tipo de venta - CORREGIDO
+        document.querySelectorAll('input[name="tipo_venta"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                const tipoVenta = radio.value;
+                localStorage.setItem("premium_tipo_venta_seleccionado", tipoVenta);
+
+                cargarTablaInicial(tipoVenta).then(() => {
+                    // Restaurar estado de incentivos ANTES de restaurar valores
+                    restaurarEstadoIncentivos();
+                    restaurarValores(tipoVenta);
+                    // Configurar el event listener del checkbox después de cargar la tabla
+                    configurarEventListenerIncentivos();
+                });
+            });
+        });
+
+        // Nueva función para configurar el event listener de incentivos
+        function configurarEventListenerIncentivos() {
+            const checkboxIncentivos = document.getElementById('activar-incentivos');
+            if (checkboxIncentivos) {
+                // Remover listeners anteriores para evitar duplicados
+                checkboxIncentivos.removeEventListener('change', toggleIncentivos);
+                checkboxIncentivos.addEventListener('change', toggleIncentivos);
+            }
+        }
+
+        // *** CARGA INICIAL CORREGIDA ***
+        document.addEventListener("DOMContentLoaded", () => {
+            const tipoGuardado = localStorage.getItem("premium_tipo_venta_seleccionado") || "equipo_nuevo";
+            const radio = document.querySelector(`input[name="tipo_venta"][value="${tipoGuardado}"]`);
+            if (radio) radio.checked = true;
+
+            // *** CARGAR LA TABLA CORRECTA PRIMERO ***
+            cargarTablaInicial(tipoGuardado).then(() => {
+                // *** RESTAURAR ESTADO DE INCENTIVOS PRIMERO ***
+                restaurarEstadoIncentivos();
+                // *** DESPUÉS RESTAURAR LOS VALORES ***
+                restaurarValores(tipoGuardado);
+                calcularTotalPremiumCompleto();
+                // *** CONFIGURAR EVENT LISTENER DEL CHECKBOX DE INCENTIVOS ***
+                configurarEventListenerIncentivos();
+            });
+
+            document.getElementById("currentYear").textContent = new Date().getFullYear();
+        });
+
+        function limpiarFormulario() {
+            localStorage.removeItem("comision_premium_equipo_nuevo");
+            localStorage.removeItem("comision_premium_equipo_propio");
+            localStorage.removeItem("comision_premium");
+            localStorage.removeItem("incentivos_premium_equipo_nuevo");
+            localStorage.removeItem("incentivos_premium_equipo_propio");
+            // Limpiar incentivos por tipo de venta
+            localStorage.removeItem('premium_incentivos_equipo_nuevo');
+            localStorage.removeItem('premium_incentivos_equipo_propio');
+
+            const tipoActual = getTipoVentaActual();
+            localStorage.removeItem(`premium_comisiones_${tipoActual}`);
+            localStorage.removeItem("premium_tipo_venta_seleccionado");
+
+            document.getElementById("formulario").reset();
+            document.getElementById('activar-incentivos').checked = false;
+            toggleIncentivos();
+            calcularTotalComision();
+
+            document.querySelectorAll('input[type="number"]').forEach(input => {
+                document.getElementById("comision-" + input.name).innerText = "$0";
+                const celdaIncentivo = document.getElementById("incentivo-" + input.name);
+                if (celdaIncentivo) {
+                    celdaIncentivo.innerText = "$0";
+                }
+            });
+
+            document.getElementById("total-comision").innerText = "$0";
+            document.getElementById("total-global").innerText = "$0";
+            ['equipo_nuevo', 'equipo_propio'].forEach(tipo => {
+              localStorage.removeItem(`datosTablaComisiones_${tipoActual}`);
+            });
+        }
+
+        setInterval(calcularTotalPremiumCompleto, 2000);
+
+        document.querySelector('#tabla-comisiones').addEventListener('input', () => {
+            const tabla = document.getElementById('tabla-comisiones');
+            if (!tabla) return;
+
+            const tipoVenta = document.querySelector('input[name="tipo_venta"]:checked')?.value || 'equipo_nuevo';
+            const datos = [];
+
+            const filas = tabla.querySelectorAll('tbody tr');
+            let hayDatos = false;
+
+            filas.forEach(fila => {
+                const plan = fila.cells[0]?.textContent.trim() || '';
+                const input = fila.querySelector('input[type="number"][data-monto]');
+                const cantidad = parseInt(input.value, 10) || 0;
+                const monto = parseFloat(input.getAttribute('data-monto')) || 0;
+                const incentivo = parseInt(input.getAttribute('data-incentivo')) || 0;
+
+                if (cantidad > 0) {
+                    hayDatos = true;
+                }
+
+                datos.push({ plan, cantidad, monto, incentivo });
+            });
+
+            if (hayDatos) {
+                localStorage.setItem(`datosTablaComisiones_${tipoVenta}`, JSON.stringify(datos));
+                console.log("Datos guardados en localStorage para datosTablaComisiones_" + tipoVenta);
+                console.log(JSON.parse(localStorage.getItem(`datosTablaComisiones_${tipoVenta}`)));
+
+            } else {
+                // Si no hay datos, puedes limpiar el localStorage de esa opción si quieres:
+                localStorage.removeItem(`datosTablaComisiones_${tipoVenta}`);
+            }
+        });
+
+        
+        /*function cargarTotalesGlobales() {
+            const grupoPospago = ['premium', 'armalo', 'simple'];
+            let totalPospago = 0;
+
+            grupoPospago.forEach(sec => {
+                const valor = parseFloat(localStorage.getItem(`comision_${sec}`) || 0); // CORREGIDO: usar parseFloat
+                totalPospago += valor;
+            });
+
+            const elementoPospago = document.getElementById('td-pospago');
+            if (elementoPospago) {
+                if (totalPospago > 0) {
+                    elementoPospago.textContent = '$' + formatearNumero(totalPospago);
+                    elementoPospago.closest('tr').style.display = '';
+                } else {
+                    elementoPospago.closest('tr').style.display = 'none';
+                }
+            }
+
+            const otrasSecciones = ['seguros', 'accesorios', 'addons', 'total'];
+            let totalGlobal = totalPospago;
+
+            otrasSecciones.forEach(sec => {
+                const valor = parseInt(localStorage.getItem(`comision_${sec}`) || 0);
+                const elemento = document.getElementById(`td-${sec}`);
+
+                if (elemento) {
+                    if (valor > 0) {
+                        elemento.textContent = '$' + formatearNumero(valor);
+                        elemento.closest('tr').style.display = '';
+                        totalGlobal += valor;
+                    } else {
+                        elemento.closest('tr').style.display = 'none';
+                    }
+                }
+            });
+
+            const elementoTotal = document.getElementById('td-total-global');
+            if (elementoTotal) {
+                if (totalGlobal > 0) {
+                    elementoTotal.textContent = '$' + formatearNumero(totalGlobal);
+                    elementoTotal.closest('tr').style.display = '';
+                } else {
+                    elementoTotal.closest('tr').style.display = 'none';
+                }
+            }
+        }
+
+      // Generar PDF (solo toma lo visible)
+      document.getElementById('descargar-pdf').addEventListener('click', function () {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        const img = new Image();
+        img.src = 'static/img/PrimeMX 2024_RGB.png';
+
+        img.onload = function () {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            const imgData = canvas.toDataURL('image/png');
+
+            // Título principal
+            doc.setFont(undefined, 'bold');
+            doc.setFontSize(16);
+            doc.text("Resumen Global de Comisiones", 10, 15);
+
+            doc.autoTable({
+                html: '#tabla-global',
+                startY: 25,
+                theme: 'grid',
+                headStyles: {
+                    fillColor: [43, 181, 212],
+                    fontStyle: 'bold',
+                    fontSize: 14
+                },
+                didParseCell: function (data) {
+                    const totalRows = data.table.body.length;
+                    const isLastRow = data.row.index === totalRows - 1;
+                    if (data.section === 'body' && isLastRow) {
+                        data.cell.styles.fontStyle = 'bold';
+                        data.cell.styles.fontSize = 14;
+                    }
+                },
+                didDrawPage: function () {
+                    // Logo como encabezado en la parte superior derecha
+                    doc.addImage(imgData, 'PNG', 165, 3, 40, 8);
+
+                    // Título en cada página
+                    doc.setFont(undefined, 'bold');
+                    doc.setFontSize(16);
+                    doc.text("Resumen Global de Comisiones", 10, 15);
+                }
+            });
+
+            const finalY = doc.lastAutoTable?.finalY || 25;
+
+            // Aquí comienzan los cálculos y renderizado de datos dinámicos
+            const contenedores = [
+                'tabla-comisiones', 'tabla-negocios', 'tabla-simple',
+                'tabla-addons', 'tabla-seguros', 'tabla-total', 'tabla-accesorios'
+            ];
+
+            let totalCantidadGlobal = 0;
+            let totalComisionGlobal = 0;
+            let totalIncentivoGlobal = 0;
+            let resultadosPlanes = [];
+
+            for (const contenedorId of contenedores) {
+                const clavesPorContenedor = {
+                    'tabla-comisiones': ['datosTablaComisiones_equipo_nuevo', 'datosTablaComisiones_equipo_propio'],
+                    'tabla-negocios': ['datosTablaNegocios_equipo_nuevo', 'datosTablaNegocios_equipo_propio'],
+                    'tabla-simple': ['datosTablaSimples_simple_plus', 'datosTablaSimples_simple'],
+                    'tabla-addons': ['datosTablaAddons'],
+                    'tabla-seguros': ['datosTablaSeguros'],
+                    'tabla-total': ['datosTablaTotal_tv_incluida', 'datosTablaTotal_tv_no_incluida'],
+                    'tabla-accesorios': ['datosTablaAccesorios']
+                };
+
+                const claves = clavesPorContenedor[contenedorId] || [];
+                if (claves.length) {
+                    claves.forEach(clave => {
+                        const datosGuardados = localStorage.getItem(clave);
+                        if (!datosGuardados) return;
+
+                        try {
+                            const datos = JSON.parse(datosGuardados);
+                            if (!Array.isArray(datos) || datos.length === 0) return;
+
+                            datos.forEach(({ plan, cantidad, monto, incentivo = 0 }) => {
+                                cantidad = parseInt(cantidad);
+                                monto = parseFloat(monto);
+                                incentivo = parseFloat(incentivo);
+                                if (cantidad > 0) {
+                                    let etiqueta = '';
+                                    let planFinal = plan;
+
+                                    if (clave.includes('equipo_nuevo')) etiqueta = ' (Equipo Nuevo)';
+                                    if (clave.includes('equipo_propio')) etiqueta = ' (Equipo Propio)';
+                                    if (clave.includes('simple_plus')) etiqueta = ' (Simple_Plus)';
+                                    if (clave.includes('simple')) etiqueta = ' (Simple)';
+                                    if (clave.includes('tv_incluida')) etiqueta = ' (TV Incluida)';
+                                    if (clave.includes('tv_no_incluida')) etiqueta = ' (TV No Incluida)';
+                                    if (clave === 'datosTablaSeguros') planFinal = 'SEGURO - ' + plan;
+
+                                    const planCompleto = planFinal + etiqueta;
+
+                                    let comisionTotalPlan = 0;
+                                    if (clave === 'datosTablaAccesorios') {
+                                        comisionTotalPlan = cantidad * monto;
+                                    } else if (clave.toLowerCase().includes('addons')) {
+                                        comisionTotalPlan = cantidad * monto * 0.80;
+                                    } else {
+                                        comisionTotalPlan = cantidad * monto;
+                                    }
+
+                                    const incluirIncentivo = clave.includes('datosTablaComisiones');
+                                    const totalIncentivo = incluirIncentivo ? cantidad * incentivo : 0;
+
+                                    const existente = resultadosPlanes.find(p => p.plan === planCompleto);
+                                    if (existente) {
+                                        existente.cantidad += cantidad;
+                                        existente.comision += comisionTotalPlan;
+                                        existente.incentivo += totalIncentivo;
+                                    } else {
+                                        resultadosPlanes.push({
+                                            plan: planCompleto,
+                                            cantidad,
+                                            comision: comisionTotalPlan,
+                                            incentivo: totalIncentivo
+                                        });
+                                    }
+
+                                    totalCantidadGlobal += cantidad;
+                                    totalComisionGlobal += comisionTotalPlan;
+                                    totalIncentivoGlobal += totalIncentivo;
+                                }
+                            });
+                        } catch (err) {
+                            console.warn(`Error al parsear datos de '${clave}':`, err);
+                        }
+                    });
+
+                    resultadosPlanes.sort((a, b) => {
+                        const prioridad = (plan) => {
+                            if (plan.includes('(Equipo Nuevo)')) return 0;
+                            if (plan.includes('(Equipo Propio)')) return 1;
+                            return 2;
+                        };
+                        return prioridad(a.plan) - prioridad(b.plan);
+                    });
+                    continue;
+                }
+
+                const contenedor = document.getElementById(contenedorId);
+                if (!contenedor) continue;
+                const tabla = contenedor.querySelector('table');
+                if (!tabla) continue;
+
+                const filas = tabla.querySelectorAll('tbody tr');
+                if (!filas.length) continue;
+
+                filas.forEach(fila => {
+                    let plan = fila.cells[0]?.textContent.trim() || 'Plan desconocido';
+                    const inputCantidad = fila.querySelector('input[type="number"][data-monto]');
+                    if (!inputCantidad) return;
+
+                    const cantidad = parseInt(inputCantidad.value, 10) || 0;
+                    const monto = parseInt(inputCantidad.getAttribute('data-monto')) || 0;
+                    const incentivo = parseInt(inputCantidad.getAttribute('data-incentivo')) || 0;
+
+                    if (contenedorId === 'tabla-seguros') {
+                        plan = "SEGURO - " + plan;
+                    }
+
+                    const comisionTotalPlan = contenedorId === 'tabla-addons' ? cantidad * monto * 0.80 : cantidad * monto;
+                    const incluirIncentivo = contenedorId === 'tabla-comisiones';
+                    const totalIncentivo = incluirIncentivo ? cantidad * incentivo : 0;
+
+                    if (cantidad > 0) {
+                        resultadosPlanes.push({
+                            plan,
+                            cantidad,
+                            comision: comisionTotalPlan,
+                            incentivo: totalIncentivo > 0 ? totalIncentivo : null
+                        });
+                        totalCantidadGlobal += cantidad;
+                        totalComisionGlobal += comisionTotalPlan;
+                        totalIncentivoGlobal += totalIncentivo;
+                    }
+                });
+            }
+
+            const planesConVentas = resultadosPlanes.filter(p => p.cantidad > 0);
+            const hayIncentivos = planesConVentas.some(p => p.incentivo !== null);
+
+            let y = finalY + 10;
+            doc.setFont(undefined, 'bold');
+            doc.setFontSize(12);
+            doc.text("Detalle de la Simulación de Ventas:", 10, y);
+            y += 10;
+
+            doc.text("Plan", 10, y);
+            doc.text("Cantidad", 130, y);
+            doc.text("Comisión", 154, y);
+            if (hayIncentivos) doc.text("Incentivo", 175, y);
+            doc.setFont(undefined, 'normal');
+            y += 7;
+
+            planesConVentas.forEach(({ plan, cantidad, comision, incentivo }) => {
+                doc.text(plan, 10, y);
+                doc.text(String(cantidad), 138, y);
+                doc.text(`$${comision.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}`, 156, y);
+                if (hayIncentivos && incentivo !== null) {
+                    doc.text(`$${incentivo.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}`, 180, y);
+                }
+                y += 7;
+            });
+
+            y += 10;
+            doc.setFont(undefined, 'bold');
+            const totalGlobal = totalComisionGlobal + totalIncentivoGlobal;
+            doc.setFontSize(18);
+            doc.text(`Total Ventas Global: ${totalCantidadGlobal}`, 10, y);
+            y += 10;
+            doc.text(`Comisión estimada Global: $${totalGlobal.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}`, 10, y);
+
+            doc.save('simulacion_global_comisiones.pdf');
+        };
+    });*/
+
+    const tokenFromServer = "{{ token|default('') }}";
+
+    if (tokenFromServer) {
+        localStorage.setItem("token", tokenFromServer);
+        console.log("Token guardado en localStorage:", tokenFromServer);
+    }
+
+    // Reescribir todos los enlaces internos para agregar el token
+    document.addEventListener("DOMContentLoaded", function () {
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        // Reescribe todos los <a> internos
+        document.querySelectorAll("a[href^='/']").forEach(link => {
+        const url = new URL(link.href, window.location.origin);
+        url.searchParams.set("token", token);
+        link.href = url.toString();
+        });
+    });
+                
+    </script>
+</body>
+</html>

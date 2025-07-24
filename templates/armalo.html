@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Armalo - Calculadora de Comisiones</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-left">
+            <img src="{{ url_for('static', filename='img/PrimeMX 2024_RGB_Blanco-Color.png') }}" alt="Logo" class="logo-esquina2">
+            <a href="/" class="logo-link">
+                <svg class="icono-casa" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
+                </svg>    
+        </a>
+        </div>
+        <ul class="nav-links">
+            <li><a href="/premium" style="font-size: 15px;">PREMIUM</a></li>
+            <li><a href="/simples" style="font-size: 15px;">PIAS</a></li>
+            <li><a href="/seguros" style="font-size: 15px;">SEGUROS</a></li>
+            <li><a href="/accesorios" style="font-size: 15px;">ACCESORIOS</a></li>
+            <li><a href="/addons" style="font-size: 15px;">ADDONS</a></li>
+            <li><a href="/totalplay" style="font-size: 15px;">TOTALPLAY</a></li>
+        </ul>
+    </nav>
+    <h1>Calculadora Comisiones Planes Armalo Negocios Semanal</h1>
+    <h2>Alcance Cuota mínima de Pospago de 80%</h2>
+    <h3>Alcance Cuota mínima de Renovación de 80%</h3>
+
+    <form method="POST" id="formulario" class="contenedor-principal">
+        <div class="form-section">
+            <label><strong>Tipo de Venta:</strong></label><br>
+            <label style="color: white;"><input type="radio" name="tipo_venta" value="equipo_nuevo" {% if tipo_venta == "equipo_nuevo" %}checked{% endif %}> Pospago y Renovación Con Equipo Nuevo</label>
+            <label style="color: white;"><input type="radio" name="tipo_venta" value="equipo_propio" {% if tipo_venta == "equipo_propio" %}checked{% endif %}> Pospago Con Equipo Propio</label>
+        </div>
+
+        <div class="contenedor-flex">
+            <div id="tabla-negocios">
+                {% include 'tabla_comisiones_negocios.html' %}
+            </div>
+
+            <div class="resultado-lateral">
+                <p>Comisión Armalo:</p>
+                <p id="total-comision" class="total-cifra">
+                    ${{ "{:,}".format(total_comision) }}
+                </p>
+            </div>
+
+            <!-- RECUADRO GLOBAL -->
+            <div class="resultado-lateral2" style="margin-left: 20px;">
+                <p><strong>Total Global:</strong></p>
+                <p id="total-global" class="total-cifra">$0</p>
+            </div>
+        </div>
+
+        <div style="margin-top:2px;">
+            <button type="button" class="boton-limpiar" onclick="limpiarFormulario()">🗑️ Borrar datos guardados</button>
+        </div>
+    </form>
+
+    <footer>
+        <p>&copy; <span id="currentYear"></span> PRIMEMX. Todos los derechos reservados.</p>
+    </footer>
+
+    <script>
+        function formatearNumero(numero) {
+            return numero.toLocaleString('es-MX');
+        }
+
+        function getTipoVentaActual() {
+            const seleccionado = document.querySelector('input[name="tipo_venta"]:checked');
+            return seleccionado ? seleccionado.value : 'equipo_nuevo';
+        }
+
+        function guardarValores(tipo) {
+            const datos = {};
+            document.querySelectorAll('input[type="number"]').forEach(input => {
+                datos[input.id] = input.value;
+            });
+            localStorage.setItem(`armalo_comisiones_${tipo}`, JSON.stringify(datos));
+        }
+
+        function restaurarValores(tipo) {
+            const datos = JSON.parse(localStorage.getItem(`armalo_comisiones_${tipo}`)) || {};
+            document.querySelectorAll('input[type="number"]').forEach(input => {
+                const cantidad = datos[input.id] || 0;
+                input.value = cantidad;
+                actualizarComision(input.name, parseFloat(input.getAttribute("data-monto")));
+                input.oninput = () => actualizarComision(input.name, parseFloat(input.getAttribute("data-monto")));
+            });
+        }
+
+        function actualizarComision(plan, monto) {
+            const input = document.getElementById("cantidad-" + plan);
+            const cantidad = parseInt(input.value) || 0;
+            const comision = cantidad * monto;
+            document.getElementById("comision-" + plan).innerText = "$" + formatearNumero(comision);
+            guardarValores(getTipoVentaActual());
+            calcularTotalComision();
+        }
+
+        function calcularTotalComision() {
+            let total = 0;
+            document.querySelectorAll('input[type="number"]').forEach(input => {
+                const cantidad = parseInt(input.value) || 0;
+                const monto = parseFloat(input.getAttribute("data-monto"));
+                total += cantidad * monto;
+            });
+            document.getElementById("total-comision").innerText = "$" + formatearNumero(total);
+            
+            const tipoActual = getTipoVentaActual();
+            localStorage.setItem(`comision_armalo_${tipoActual}`, total);
+            
+            calcularTotalArmaloCompleto();
+        }
+
+        function calcularTotalArmaloCompleto() {
+            const totalArmaloEquipoNuevo = parseFloat(localStorage.getItem("comision_armalo_equipo_nuevo") || 0);
+            const totalArmaloEquipoPropio = parseFloat(localStorage.getItem("comision_armalo_equipo_propio") || 0);
+            const totalArmalo = totalArmaloEquipoNuevo + totalArmaloEquipoPropio;
+            
+            localStorage.setItem("comision_armalo", totalArmalo);
+            actualizarComisionGlobal();
+        }
+
+        function actualizarComisionGlobal() {
+            const keys = [
+                "comision_premium",
+                "comision_armalo",
+                "comision_simple",
+                "comision_seguros", 
+                "comision_addons",
+                "comision_accesorios",
+                "comision_total",
+            ];
+            let total = 0;
+            for (let key of keys) {
+                total += parseFloat(localStorage.getItem(key) || 0);
+            }
+            document.getElementById("total-global").textContent = "$" + formatearNumero(Math.round(total));
+        }
+
+        // *** FUNCIÓN PARA CARGAR TABLA INICIAL ***
+        function cargarTablaInicial(tipoVenta) {
+            const formData = new FormData();
+            formData.append("tipo_venta", tipoVenta);
+
+            return fetch("/tabla_comisiones_negocios", {
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("tabla-negocios").innerHTML = data.html;
+                return data;
+            });
+        }
+
+        // Cambio de tipo de venta
+        document.querySelectorAll('input[name="tipo_venta"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                const tipoVenta = radio.value;
+                localStorage.setItem("armalo_tipo_venta_seleccionado", tipoVenta);
+
+                cargarTablaInicial(tipoVenta).then(() => {
+                    restaurarValores(tipoVenta);
+                });
+            });
+        });
+
+        // *** RESTAURAR AL CARGAR - CORREGIDO ***
+        window.addEventListener("load", () => {
+            const tipoGuardado = localStorage.getItem("armalo_tipo_venta_seleccionado") || "equipo_nuevo";
+            const radio = document.querySelector(`input[name="tipo_venta"][value="${tipoGuardado}"]`);
+            if (radio) radio.checked = true;
+
+            // *** CARGAR LA TABLA CORRECTA PRIMERO ***
+            cargarTablaInicial(tipoGuardado).then(() => {
+                // *** DESPUÉS RESTAURAR LOS VALORES ***
+                restaurarValores(tipoGuardado);
+                calcularTotalArmaloCompleto();
+            });
+            
+            document.getElementById("currentYear").textContent = new Date().getFullYear();
+        });
+
+        function limpiarFormulario() {
+            localStorage.removeItem("comision_armalo_equipo_nuevo");
+            localStorage.removeItem("comision_armalo_equipo_propio");
+            localStorage.removeItem("comision_armalo");
+            
+            const tipoActual = getTipoVentaActual();
+            localStorage.removeItem(`armalo_comisiones_${tipoActual}`);
+            localStorage.removeItem("armalo_tipo_venta_seleccionado");
+            
+            document.getElementById("formulario").reset();
+            calcularTotalComision();
+            document.querySelectorAll('input[type="number"]').forEach(input => {
+                document.getElementById("comision-" + input.name).innerText = "$0";
+            });
+            document.getElementById("total-comision").innerText = "$0";
+            document.getElementById("total-global").innerText = "$0";
+
+            ['equipo_nuevo', 'equipo_propio'].forEach(tipo => {
+              localStorage.removeItem(`datosTablaNegocios_${tipoActual}`);
+            });
+        }
+
+        setInterval(calcularTotalArmaloCompleto, 2000)
+
+        document.addEventListener('input', () => {
+            const tabla = document.getElementById('tabla-negocios');
+            if (!tabla) return;
+
+            const tipoVenta = document.querySelector('input[name="tipo_venta"]:checked')?.value || 'equipo_nuevo';
+            const datos = [];
+
+            const filas = tabla.querySelectorAll('tbody tr');
+            let hayDatos = false;
+
+            filas.forEach(fila => {
+                const plan = fila.cells[0]?.textContent.trim() || '';
+                const input = fila.querySelector('input[type="number"][data-monto]');
+                const cantidad = parseInt(input.value, 10) || 0;
+                const monto = parseFloat(input.getAttribute('data-monto')) || 0;
+
+                if (cantidad > 0) {
+                    hayDatos = true;
+                }
+
+                datos.push({ plan, cantidad, monto });
+            });
+
+            if (hayDatos) {
+                localStorage.setItem(`datosTablaNegocios_${tipoVenta}`, JSON.stringify(datos));
+            } else {
+                // Si no hay datos, puedes limpiar el localStorage de esa opción si quieres:
+                localStorage.removeItem(`datosTablaNegocios_${tipoVenta}`);
+            }
+        });
+
+        const tokenFromServer = "{{ token|default('') }}";
+
+    if (tokenFromServer) {
+        localStorage.setItem("token", tokenFromServer);
+        console.log("Token guardado en localStorage:", tokenFromServer);
+    }
+
+    // Reescribir todos los enlaces internos para agregar el token
+    document.addEventListener("DOMContentLoaded", function () {
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        // Reescribe todos los <a> internos
+        document.querySelectorAll("a[href^='/']").forEach(link => {
+        const url = new URL(link.href, window.location.origin);
+        url.searchParams.set("token", token);
+        link.href = url.toString();
+        });
+    });
+    </script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+<table border="1">
+    <thead>
+        <tr>
+            <th>Plan</th>
+            <th>Renta</th>
+            <th>Cantidad</th>
+            <th>Comisión Base</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for plan, monto in comisiones.items() %}
+        <tr>
+            <td>{{ plan }}</td>
+            <td>${{ '{:,}'.format(monto) }}</td>
+            <td>
+                <input type="number"
+                       name="{{ plan }}"
+                       min="0"
+                       value="{{ cantidades.get(plan, 0) }}"
+                       data-monto="{{ monto }}"
+                       oninput="actualizarComision('{{ plan }}', {{ monto }})"
+                       id="cantidad-{{ plan }}">
+            </td>
+            <td id="comision-{{ plan }}">${{ '{:,}'.format(cantidades.get(plan, 0) * monto * 0.8) }}</td>
+
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

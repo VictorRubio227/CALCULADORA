@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Comisiones</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="index">
+    <img src="{{ url_for('static', filename='img/PrimeMX 2024_RGB_Blanco-Color.png') }}" alt="Logo" class="logo-esquina">
+    <button type="button" class="boton-pdf" id="descargar-pdf">📄 Descargar Simulacion</button>
+    <button class="boton-borrar" onclick="mostrarConfirmacion()">🗑️ Borrar Todo</button>
+    
+    <!-- Modal de confirmación -->
+    <div class="modal-overlay" id="modalConfirmacion">
+        <div class="modal">
+            <h3>⚠️ Confirmar Eliminación</h3>
+            <p>Esta acción eliminará <strong>TODA</strong> la información de todas las tablas, incluyendo:</p>
+            <ul style="text-align: left; margin: 20px 0;">
+                <li>Todos los datos ingresados en las tablas</li>
+                <li>Resultados locales de cada categoría</li>
+                <li>Total global de comisiones</li>
+            </ul>
+            <p style="color: #dc3545; font-weight: bold;">Esta acción no se puede deshacer. ¿Deseas continuar?</p>
+            <div class="modal-buttons">
+                <button class="modal-btn btn-confirmar" onclick="borrarTodo()">Aceptar</button>
+                <button class="modal-btn btn-cancelar" onclick="cerrarModal()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <h1 style="margin-top: 15%;">Calculadora de Comisiones Semanal</h1>
+    <h2 style="color: whitesmoke; font-size: 20px;">Selecciona una categoría</h2>
+    
+    <div class="menu-opciones">
+        <a href="/posyrenos?token={{ token_guardado }}" class="pospago azul">📱 Pospago y Renovación</a>
+        <a href="/seguros?token={{ token_guardado }}" class="verde">🛡️ Seguros</a>
+        <a href="/addons" class="morado">➕ Addons</a>
+        <a href="/accesorios" class="fucsia">🎧 Accesorios</a>
+        <a href="/totalplay" class="rojo">🖥️ Totalplay</a>
+    </div>
+    
+    <table id="tabla-global" style="display:none;">
+    <thead>
+      <tr>
+        <th>Metrica</th>
+        <th>Comisión</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Pospago y Renovaciones</td><td id="td-pospago">$0</td></tr>
+      <tr><td>Seguros</td><td id="td-seguros">$0</td></tr>
+      <tr><td>Accesorios</td><td id="td-accesorios">$0</td></tr>
+      <tr><td>Addons</td><td id="td-addons">$0</td></tr>
+      <tr><td>Totalplay</td><td id="td-total">$0</td></tr>
+      <tr><td><strong style="font-size: 18px;">Total Global</strong></td><td id="td-total-global" style="font-size: 18px; font-weight: bold;"><strong>$0</strong></td></tr>
+    </tbody>
+    </table>
+
+    <!-- Este recuadro debe iniciar oculto -->
+    <div class="resultado-lateral3" id="recuadro-total-global" style="margin-left: 20px; display: none;">
+        <p style="margin-top: 3px;" ><strong>Total Global:</strong></p>
+        <p id="total-global" class="total-cifra" style="font-size: 36px; color: white; margin-bottom: 3px;">$0</p>
+    </div>
+
+    <footer >
+        <p >&copy; <span id="currentYear"></span> PRIMEMX. Todos los derechos reservados.</p>
+    </footer>
+
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+<script>
+    function formatearNumero(numero) {
+        return numero.toLocaleString('es-MX', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        });
+    }
+
+    function actualizarComisionGlobal() {
+        const keys = [
+            "comision_premium",
+            "comision_armalo",
+            "comision_simple",
+            "comision_seguros", 
+            "comision_addons",
+            "comision_accesorios",
+            "comision_total"
+        ];
+
+        let total = 0;
+        for (let key of keys) {
+            total += parseFloat(localStorage.getItem(key) || 0);
+        }
+
+        const recuadro = document.getElementById("recuadro-total-global");
+        const totalElement = document.getElementById("total-global");
+        totalElement.textContent = "$" + formatearNumero(total);
+
+        // Mostrar u ocultar según el valor total
+        if (total > 0) {
+            recuadro.style.display = "inline-block";
+        } else {
+            recuadro.style.display = "none";
+        }
+    }
+
+    function mostrarConfirmacion() {
+        document.getElementById('modalConfirmacion').classList.add('show');
+    }
+
+    function cerrarModal() {
+        document.getElementById('modalConfirmacion').classList.remove('show');
+    }
+
+    function borrarTodo() {
+        try {
+            // Limpiar todas las claves del localStorage
+            const keysToDelete = [
+                "comision_premium",
+                "comision_armalo", 
+                "comision_simple",
+                "comision_seguros",
+                "comision_addons",
+                "comision_accesorios",
+                "comision_total","comision_total_tv_incluida",
+                "comision_total_tv_no_incluida", 
+                "total_comisiones_tv_incluida",
+                "total_comisiones_tv_no_incluida",
+                "total_tipo_venta_seleccionado",
+                "datosTablaTotal_tv_incluida",
+                "datosTablaTotal_tv_no_incluida",
+                "comision_premium_equipo_nuevo",
+                "comision_premium_equipo_propio",
+                "comision_premium",
+                "incentivos_premium_equipo_nuevo",
+                "incentivos_premium_equipo_propio",
+                "premium_incentivos_equipo_nuevo",
+                "premium_incentivos_equipo_propio",
+                "premium_comisiones_equipo_nuevo",
+                "premium_comisiones_equipo_propio",
+                "premium_tipo_venta_seleccionado",
+                "datosTablaComisiones_equipo_nuevo",
+                "datosTablaComisiones_equipo_propio",
+                "armalo_tipo_venta_seleccionado",
+                "comision_armalo_equipo_nuevo",
+                "comision_armalo_equipo_propio",
+                "comision_armalo",
+                "armalo_comisiones_equipo_nuevo",
+                "armalo_comisiones_equipo_propio",
+                "datosTablaNegocios_equipo_nuevo",
+                "datosTablaNegocios_equipo_propio",
+                "simple_tipo_venta_seleccionado",
+                "comision_simple_simple_plus",
+                "comision_simple",
+                "datosTablaSimples_simple_plus",
+                "datosTablaSimples_simple",
+                "simple_comisiones_simple_plus",
+                "simple_comisiones_simple",
+                "comision_seguros",
+                "input-cantidad",
+                "datosTablaSeguros",
+                "comision_addons",
+                "datosTablaAddons",
+                "comision_accesorios",
+                'estadoAccesorios',
+                "datosTablaAccesorios",
+                "input",
+            ];
+
+            const addonKeys = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('addon-')) {
+                    addonKeys.push(key);
+                }
+            }
+
+            // Combinar ambas listas y eliminar
+            const allKeysToDelete = [...keysToDelete, ...addonKeys];
+            
+            allKeysToDelete.forEach(key => {
+                localStorage.removeItem(key);
+            });
+
+            keysToDelete.forEach(key => {
+                localStorage.removeItem(key);
+            });
+
+            // Establecer señal de limpieza para otras páginas
+            localStorage.setItem('limpiar_todo_global', 'true');
+            
+            // Cerrar el modal
+            cerrarModal();
+            
+            // Mostrar mensaje de confirmación
+            alert('✅ Toda la información ha sido eliminada correctamente. Al visitar cada página se limpiarán automáticamente.');
+            
+            console.log('Limpieza global completada exitosamente');
+            
+            // Recargar la página actual después de un breve delay
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+            
+        } catch (error) {
+            console.error('Error al limpiar:', error);
+            alert('⚠️ Hubo un error al limpiar la información. Por favor, recarga la página.');
+        }
+    }
+
+    // Cerrar modal al hacer clic fuera de él
+    document.getElementById('modalConfirmacion').addEventListener('click', function(e) {
+        if (e.target === this) {
+            cerrarModal();
+        }
+    });
+
+    // Cerrar modal con la tecla Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            cerrarModal();
+        }
+    });
+    // Ejecutar al cargar
+    window.addEventListener("load", () => {
+        actualizarComisionGlobal();
+        cargarTotalesGlobales();
+        document.getElementById("currentYear").textContent = new Date().getFullYear();
+    });
+
+    // Y seguir actualizando cada 2 segundos por si el usuario cambia otra categoría
+    setInterval(actualizarComisionGlobal, 2000);
+
+    function cargarTotalesGlobales() {
+            const grupoPospago = ['premium', 'armalo', 'simple'];
+            let totalPospago = 0;
+
+            grupoPospago.forEach(sec => {
+                const valor = parseFloat(localStorage.getItem(`comision_${sec}`) || 0); // CORREGIDO: usar parseFloat
+                totalPospago += valor;
+            });
+
+            const elementoPospago = document.getElementById('td-pospago');
+            if (elementoPospago) {
+                if (totalPospago > 0) {
+                    elementoPospago.textContent = '$' + formatearNumero(totalPospago);
+                    elementoPospago.closest('tr').style.display = '';
+                } else {
+                    elementoPospago.closest('tr').style.display = 'none';
+                }
+            }
+
+            const otrasSecciones = ['seguros', 'accesorios', 'addons', 'total'];
+            let totalGlobal = totalPospago;
+
+            otrasSecciones.forEach(sec => {
+                const valor = parseInt(localStorage.getItem(`comision_${sec}`) || 0);
+                const elemento = document.getElementById(`td-${sec}`);
+
+                if (elemento) {
+                    if (valor > 0) {
+                        elemento.textContent = '$' + formatearNumero(valor);
+                        elemento.closest('tr').style.display = '';
+                        totalGlobal += valor;
+                    } else {
+                        elemento.closest('tr').style.display = 'none';
+                    }
+                }
+            });
+
+            const elementoTotal = document.getElementById('td-total-global');
+            if (elementoTotal) {
+                if (totalGlobal > 0) {
+                    elementoTotal.textContent = '$' + formatearNumero(totalGlobal);
+                    elementoTotal.closest('tr').style.display = '';
+                } else {
+                    elementoTotal.closest('tr').style.display = 'none';
+                }
+            }
+        }
+
+      // Generar PDF (solo toma lo visible)
+      document.getElementById('descargar-pdf').addEventListener('click', function () {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        const img = new Image();
+        img.src = 'static/img/PrimeMX 2024_RGB.png';
+
+        img.onload = function () {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            const imgData = canvas.toDataURL('image/png');
+
+            // Título principal
+            doc.setFont(undefined, 'bold');
+            doc.setFontSize(16);
+            doc.text("Resumen Global de Comisiones", 10, 15);
+
+            doc.autoTable({
+                html: '#tabla-global',
+                startY: 25,
+                theme: 'grid',
+                headStyles: {
+                    fillColor: [43, 181, 212],
+                    fontStyle: 'bold',
+                    fontSize: 14
+                },
+                didParseCell: function (data) {
+                    const totalRows = data.table.body.length;
+                    const isLastRow = data.row.index === totalRows - 1;
+                    if (data.section === 'body' && isLastRow) {
+                        data.cell.styles.fontStyle = 'bold';
+                        data.cell.styles.fontSize = 14;
+                    }
+                },
+                didDrawPage: function () {
+                    // Logo como encabezado en la parte superior derecha
+                    doc.addImage(imgData, 'PNG', 165, 3, 40, 8);
+
+                    // Título en cada página
+                    doc.setFont(undefined, 'bold');
+                    doc.setFontSize(16);
+                    doc.text("Resumen Global de Comisiones", 10, 15);
+                }
+            });
+
+            const finalY = doc.lastAutoTable?.finalY || 25;
+
+            // Aquí comienzan los cálculos y renderizado de datos dinámicos
+            const contenedores = [
+                'tabla-comisiones', 'tabla-negocios', 'tabla-simple',
+                'tabla-addons', 'tabla-seguros', 'tabla-total', 'tabla-accesorios'
+            ];
+
+            let totalCantidadGlobal = 0;
+            let totalComisionGlobal = 0;
+            let totalIncentivoGlobal = 0;
+            let resultadosPlanes = [];
+
+            for (const contenedorId of contenedores) {
+                const clavesPorContenedor = {
+                    'tabla-comisiones': ['datosTablaComisiones_equipo_nuevo', 'datosTablaComisiones_equipo_propio'],
+                    'tabla-negocios': ['datosTablaNegocios_equipo_nuevo', 'datosTablaNegocios_equipo_propio'],
+                    'tabla-simple': ['datosTablaSimples_simple_plus', 'datosTablaSimples_simple'],
+                    'tabla-addons': ['datosTablaAddons'],
+                    'tabla-seguros': ['datosTablaSeguros'],
+                    'tabla-total': ['datosTablaTotal_tv_incluida', 'datosTablaTotal_tv_no_incluida'],
+                    'tabla-accesorios': ['datosTablaAccesorios']
+                };
+
+                const claves = clavesPorContenedor[contenedorId] || [];
+                if (claves.length) {
+                    claves.forEach(clave => {
+                        const datosGuardados = localStorage.getItem(clave);
+                        if (!datosGuardados) return;
+
+                        try {
+                            const datos = JSON.parse(datosGuardados);
+                            if (!Array.isArray(datos) || datos.length === 0) return;
+
+                            datos.forEach(({ plan, cantidad, monto, incentivo = 0 }) => {
+                                cantidad = parseInt(cantidad);
+                                monto = parseFloat(monto);
+                                incentivo = parseFloat(incentivo);
+                                if (cantidad > 0) {
+                                    let etiqueta = '';
+                                    let planFinal = plan;
+
+                                    if (clave.includes('equipo_nuevo')) etiqueta = ' (Equipo Nuevo)';
+                                    if (clave.includes('equipo_propio')) etiqueta = ' (Equipo Propio)';
+                                    if (clave.includes('simple_plus')) etiqueta = ' (Simple_Plus)';
+                                    if (clave.includes('simple')) etiqueta = ' (Simple)';
+                                    if (clave.includes('tv_incluida')) etiqueta = ' (TV Incluida)';
+                                    if (clave.includes('tv_no_incluida')) etiqueta = ' (TV No Incluida)';
+                                    if (clave === 'datosTablaSeguros') planFinal = 'SEGURO - ' + plan;
+
+                                    const planCompleto = planFinal + etiqueta;
+
+                                    let comisionTotalPlan = 0;
+                                    if (clave === 'datosTablaAccesorios') {
+                                        comisionTotalPlan = cantidad * monto;
+                                    } else if (clave.toLowerCase().includes('addons')) {
+                                        comisionTotalPlan = cantidad * monto * 0.80;
+                                    } else {
+                                        comisionTotalPlan = cantidad * monto;
+                                    }
+
+                                    // CORREGIDO: Verificar si los incentivos están activados
+                                    const incluirIncentivo = clave.includes('datosTablaComisiones');
+                                    let totalIncentivo = 0;
+                                    
+                                    // Solo calcular incentivos si están activados y es una tabla de comisiones Premium
+                                    if (incluirIncentivo) {
+                                        // Verificar el estado de los incentivos según la clave
+                                        let incentivoActivado = false;
+                                        if (clave.includes('equipo_nuevo')) {
+                                            incentivoActivado = localStorage.getItem('premium_incentivos_equipo_nuevo') === 'true';
+                                        } else if (clave.includes('equipo_propio')) {
+                                            incentivoActivado = localStorage.getItem('premium_incentivos_equipo_propio') === 'true';
+                                        }
+                                        
+                                        if (incentivoActivado) {
+                                            totalIncentivo = cantidad * incentivo;
+                                        }
+                                    }
+
+                                    const existente = resultadosPlanes.find(p => p.plan === planCompleto);
+                                    if (existente) {
+                                        existente.cantidad += cantidad;
+                                        existente.comision += comisionTotalPlan;
+                                        // CORREGIDO: Solo sumar incentivos si están activados
+                                        if (totalIncentivo > 0) {
+                                            existente.incentivo = (existente.incentivo || 0) + totalIncentivo;
+                                        }
+                                    } else {
+                                        resultadosPlanes.push({
+                                            plan: planCompleto,
+                                            cantidad,
+                                            comision: comisionTotalPlan,
+                                            // CORREGIDO: Solo asignar incentivos si están activados
+                                            incentivo: totalIncentivo > 0 ? totalIncentivo : null
+                                        });
+                                    }
+
+                                    totalCantidadGlobal += cantidad;
+                                    totalComisionGlobal += comisionTotalPlan;
+                                    // CORREGIDO: Solo sumar incentivos si están realmente activados
+                                    totalIncentivoGlobal += totalIncentivo;
+                                }
+                            });
+                        } catch (err) {
+                            console.warn(`Error al parsear datos de '${clave}':`, err);
+                        }
+                    });
+
+                    resultadosPlanes.sort((a, b) => {
+                        const prioridad = (plan) => {
+                            if (plan.includes('(Equipo Nuevo)')) return 0;
+                            if (plan.includes('(Equipo Propio)')) return 1;
+                            return 2;
+                        };
+                        return prioridad(a.plan) - prioridad(b.plan);
+                    });
+                    continue;
+                }
+
+                const contenedor = document.getElementById(contenedorId);
+                if (!contenedor) continue;
+                const tabla = contenedor.querySelector('table');
+                if (!tabla) continue;
+
+                const filas = tabla.querySelectorAll('tbody tr');
+                if (!filas.length) continue;
+
+                filas.forEach(fila => {
+                    let plan = fila.cells[0]?.textContent.trim() || 'Plan desconocido';
+                    const inputCantidad = fila.querySelector('input[type="number"][data-monto]');
+                    if (!inputCantidad) return;
+
+                    const cantidad = parseInt(inputCantidad.value, 10) || 0;
+                    const monto = parseInt(inputCantidad.getAttribute('data-monto')) || 0;
+                    const incentivo = parseInt(inputCantidad.getAttribute('data-incentivo')) || 0;
+
+                    if (contenedorId === 'tabla-seguros') {
+                        plan = "SEGURO - " + plan;
+                    }
+
+                    const comisionTotalPlan = contenedorId === 'tabla-addons' ? cantidad * monto * 0.80 : cantidad * monto;
+                    
+                    // CORREGIDO: Verificar si los incentivos están realmente activados
+                    let totalIncentivo = 0;
+                    if (contenedorId === 'tabla-comisiones') {
+                        // Verificar el estado de los incentivos en localStorage
+                        const incentivoActivado = localStorage.getItem('premium_incentivos_equipo_nuevo') === 'true' || 
+                                                localStorage.getItem('premium_incentivos_equipo_propio') === 'true';
+                        
+                        if (incentivoActivado) {
+                            totalIncentivo = cantidad * incentivo;
+                        }
+                    }
+
+                    if (cantidad > 0) {
+                        resultadosPlanes.push({
+                            plan,
+                            cantidad,
+                            comision: comisionTotalPlan,
+                            // CORREGIDO: Solo asignar incentivos si están activados
+                            incentivo: totalIncentivo > 0 ? totalIncentivo : null
+                        });
+                        totalCantidadGlobal += cantidad;
+                        totalComisionGlobal += comisionTotalPlan;
+                        // CORREGIDO: Solo sumar incentivos si están realmente activados
+                        totalIncentivoGlobal += totalIncentivo;
+                    }
+                });
+            }
+
+            const planesConVentas = resultadosPlanes.filter(p => p.cantidad > 0);
+            const hayIncentivos = planesConVentas.some(p => p.incentivo !== null && p.incentivo > 0);
+
+            let y = finalY + 10;
+            doc.setFont(undefined, 'bold');
+            doc.setFontSize(12);
+            doc.text("Detalle de la Simulación de Ventas:", 10, y);
+            y += 10;
+
+            doc.text("Plan", 10, y);
+            doc.text("Cantidad", 130, y);
+            doc.text("Comisión", 154, y);
+            if (hayIncentivos) doc.text("Incentivo", 175, y);
+            doc.setFont(undefined, 'normal');
+            y += 7;
+
+            planesConVentas.forEach(({ plan, cantidad, comision, incentivo }) => {
+                doc.text(plan, 10, y);
+                doc.text(String(cantidad), 138, y);
+                doc.text(`$${comision.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}`, 156, y);
+                if (hayIncentivos && incentivo !== null && incentivo > 0) {
+                    doc.text(`$${incentivo.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}`, 180, y);
+                }
+                y += 7;
+            });
+
+            y += 10;
+            doc.setFont(undefined, 'bold');
+            // CORREGIDO: Solo sumar incentivos que realmente aplican
+            const totalGlobal = totalComisionGlobal + totalIncentivoGlobal;
+            doc.setFontSize(18);
+            doc.text(`Total Ventas Global: ${totalCantidadGlobal}`, 10, y);
+            y += 10;
+            doc.text(`Comisión estimada Global: $${totalGlobal.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}`, 10, y);
+
+            doc.save('simulacion_global_comisiones.pdf');
+        };
+    });
+
+    const tokenFromServer = "{{ token|default('') }}";
+
+    if (tokenFromServer) {
+        localStorage.setItem("token", tokenFromServer);
+        console.log("Token guardado en localStorage:", tokenFromServer);
+    }
+
+    // Reescribir todos los enlaces internos para agregar el token
+    document.addEventListener("DOMContentLoaded", function () {
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        // Reescribe todos los <a> internos
+        document.querySelectorAll("a[href^='/']").forEach(link => {
+        const url = new URL(link.href, window.location.origin);
+        url.searchParams.set("token", token);
+        link.href = url.toString();
+        });
+    });
+    
+    
+</script>
+
+</body>
+
+</html>
