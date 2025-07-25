@@ -46,7 +46,8 @@ conn_string = (
     f"SERVER={server};"
     f"DATABASE={database};"
     f"UID={username};"
-    f"PWD={password}"
+    f"PWD={password}",
+    "TrustServerCertificate=yes;"
 )
 
 conn = pyodbc.connect(conn_string)
