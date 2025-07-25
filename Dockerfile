@@ -25,7 +25,7 @@ WORKDIR /app
 
 # Copiar archivos
 COPY . /app/
-COPY .env /app/.env
+
 
 # Instala dependencias de Python
 RUN pip install --upgrade pip
