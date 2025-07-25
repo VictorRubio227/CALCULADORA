@@ -11,6 +11,7 @@ load_dotenv()
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime
 
+
 app = Flask(__name__)
 SECRET_KEY = os.getenv("SECRET_KEY") 
 def token_required(f):
@@ -50,6 +51,7 @@ conn_string = (
     f"PWD={password};"
     "TrustServerCertificate=yes;"
 )
+
 
 conn = pyodbc.connect(conn_string)
 
