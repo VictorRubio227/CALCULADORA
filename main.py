@@ -4,6 +4,7 @@ import jwt
 from functools import wraps
 import pandas as pd
 import os
+import sys
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -46,11 +47,18 @@ conn_string = (
     f"SERVER={server};"
     f"DATABASE={database};"
     f"UID={username};"
-    f"PWD={password}",
+    f"PWD={password};"
     "TrustServerCertificate=yes;"
 )
 
 conn = pyodbc.connect(conn_string)
+
+try:
+    conn = pyodbc.connect(conn_string)
+    print("Conexión a base de datos exitosa.")
+except Exception as e:
+    print(f"Error al conectar a la base de datos: {e}", file=sys.stderr)
+    sys.exit(1)
 
 # Diccionario de comisiones
 comisiones = {
@@ -305,6 +313,8 @@ def generar_cache_accesorios():
     os.makedirs("cache", exist_ok=True)
     df.to_parquet("cache/accesorios.parquet", index=False)
     print("Cache accesorios actualizado correctamente.")
+
+generar_cache_accesorios()
 
 # Ruta que lee desde archivo Parquet (cache)
 @app.route('/accesorios')
