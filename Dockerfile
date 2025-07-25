@@ -1,25 +1,30 @@
 # Imagen base
-FROM python:3.13-slim
+FROM python:3.13-slim-bullseye
 
 # Variables de entorno
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
 # Instala dependencias del sistema
-RUN apt-get update && apt-get install -y \
-    curl \
-    gnupg \
-    apt-transport-https \
-    unixodbc \
-    unixodbc-dev \
-    libunwind8 \
-    gcc \
-    g++ \
-    && curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /usr/share/keyrings/microsoft.gpg \
-    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/debian/11/prod bullseye main" > /etc/apt/sources.list.d/mssql-release.list \
-    && apt-get update \
-    && ACCEPT_EULA=Y apt-get install -y msodbcsql18 \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y \
+        curl \
+        gnupg2 \
+        apt-transport-https \
+        unixodbc \
+        unixodbc-dev \
+        libunwind8 \
+        gcc \
+        g++ \
+        ca-certificates \
+        software-properties-common && \
+    curl -sSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /usr/share/keyrings/microsoft.gpg && \
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/debian/11/prod bullseye main" > /etc/apt/sources.list.d/mssql-release.list && \
+    apt-get update && \
+    ACCEPT_EULA=Y apt-get install -y msodbcsql18 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 
 # Crear directorio de la app
 WORKDIR /app
