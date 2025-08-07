@@ -1,10 +1,11 @@
-from flask import Flask, render_template, request, jsonify, render_template_string, abort
+from flask import Flask, render_template, request,url_for, jsonify, render_template_string, abort, redirect
 import pyodbc
 import jwt
 from functools import wraps
 import pandas as pd
 import os
 import sys
+import requests
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -14,25 +15,103 @@ from datetime import datetime
 
 app = Flask(__name__)
 SECRET_KEY = os.getenv("SECRET_KEY") 
+
+PRIME_MX_API_URL = "https://api.primecomms.mx/portal-authenticator-service/auth/validate_external_token"
+PRIME_MX_API_KEY = os.getenv("PRIME_MX_API_KEY")
+ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
+
+def validate_token_with_prime_mx(token):
+    """
+    Valida el token con el API de Prime MX
+    Retorna: (es_valido: bool, user_info: dict)
+    """
+    try:
+        headers = {
+            "Authorization": PRIME_MX_API_KEY,
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "token": token
+        }
+        
+        response = requests.post(PRIME_MX_API_URL, json=payload, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            user_info = response.json()
+            return True, user_info
+        elif response.status_code == 401:
+            return False, {}
+        else:
+            print(f"Error inesperado del API Prime MX: {response.status_code}")
+            return False, {}
+            
+    except requests.RequestException as e:
+        print(f"Error al conectar con Prime MX API: {e}")
+        return False, {}
+
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        if ENVIRONMENT == "local":
+            # Simulación de usuario local
+            request.user_info = {
+                "user_id": "local_user",
+                "name": "Usuario Local",
+                "email": "local@demo.com"
+            }
+            return f(*args, **kwargs)
+
         token = None
         auth_header = request.headers.get("Authorization")
         if auth_header and auth_header.startswith("Bearer "):
             token = auth_header.split(" ")[1]
         else:
-            token = request.args.get("token")  # buscar token en URL también
+            token = request.args.get("token")
+
         if not token:
-            return "Token requerido", 401
-        try:
-            jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        except jwt.ExpiredSignatureError:
-            return jsonify({"message": "Token expirado"}), 401
-        except jwt.InvalidTokenError:
-            return jsonify({"message": "Token expirado"}), 401
+            return render_template("login.html"), 401
+
+        is_valid, user_info = validate_token_with_prime_mx(token)
+        if not is_valid:
+            return render_template("login.html", error="Sesión expirada o token inválido"), 401
+
+        request.user_info = user_info
         return f(*args, **kwargs)
     return decorated
+
+# Nueva ruta para manejar el flujo de autenticación desde Prime MX
+@app.route("/token")
+def handle_token_auth():
+    """
+    Endpoint que recibe el token desde Prime MX Portal
+    Formato esperado: https://tu-app.com/token?token=USER_AUTH_TOKEN
+    """
+    token = request.args.get("token")
+    
+    if not token:
+        return render_template("login.html", error="Token no proporcionado"), 400
+    
+    # Validar token con Prime MX
+    is_valid, user_info = validate_token_with_prime_mx(token)
+    
+    if is_valid:
+        # Token válido, redirigir a la página principal con el token
+        return redirect(url_for('index', token=token))
+    else:
+        # Token inválido, mostrar login
+        return render_template("login.html", error="Token inválido o expirado"), 401
+
+# Ruta de login manual (fallback)
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        # Aquí podrías implementar autenticación local si es necesario
+        # Por ahora, solo mostrar mensaje de que deben usar Prime MX Portal
+        return render_template("login.html", 
+                             error="Por favor, accede a través del Portal de Prime MX")
+    
+    return render_template("login.html")
 
 
 
@@ -460,16 +539,12 @@ def calcular_comision():
 
     return jsonify({"total_comision": round(total_comision, 2)})
 
-@app.route("/token_de_prueba")
-def token_de_prueba():
-    token = jwt.encode({"user": "test"}, SECRET_KEY, algorithm="HS256")
-    return jsonify({"token": token})
 
 import atexit
 atexit.register(lambda: scheduler.shutdown())
 
 
-if __name__ == "__main__":
-    # app.run()
-    generar_cache_accesorios()
-    app.run(debug=True, port=5000)
+# if __name__ == "__main__":
+#     # app.run()
+#     generar_cache_accesorios()
+#     app.run(debug=True, port=5000)
